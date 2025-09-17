@@ -1,12 +1,96 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
-import * as pty from 'node-pty'
+import { setupApplicationMenu } from './menu'
+
+// Temporarily disable node-pty due to C++20 compilation issues
+let pty: any = null;
+console.warn('Terminal functionality is temporarily disabled due to node-pty compilation issues');
+
+// Settings management
+interface AppSettings {
+  theme: 'light' | 'dark' | 'system';
+  fontSize: number;
+  sidebarCollapsed: boolean;
+  defaultOutputDirectory?: string;
+  preserveFileStructure: boolean;
+  showConversionProgress: boolean;
+  autoOpenOutput: boolean;
+  defaultShell?: string;
+  terminalFontSize: number;
+  terminalFontFamily: string;
+  maxTerminalHistory: number;
+  clearTerminalOnStart: boolean;
+  windowBounds: { width: number; height: number; x?: number; y?: number; };
+  alwaysOnTop: boolean;
+  minimizeToTray: boolean;
+  enableDebugMode: boolean;
+  maxErrorLogSize: number;
+  checkForUpdates: boolean;
+  sendUsageStatistics: boolean;
+  recentFiles: string[];
+  recentDirectories: string[];
+}
+
+const defaultSettings: AppSettings = {
+  theme: 'system',
+  fontSize: 14,
+  sidebarCollapsed: false,
+  preserveFileStructure: true,
+  showConversionProgress: true,
+  autoOpenOutput: false,
+  terminalFontSize: 14,
+  terminalFontFamily: 'Monaco, Consolas, "Courier New", monospace',
+  maxTerminalHistory: 1000,
+  clearTerminalOnStart: false,
+  windowBounds: { width: 1200, height: 800 },
+  alwaysOnTop: false,
+  minimizeToTray: false,
+  enableDebugMode: false,
+  maxErrorLogSize: 100,
+  checkForUpdates: true,
+  sendUsageStatistics: false,
+  recentFiles: [],
+  recentDirectories: [],
+};
+
+let userSettings: AppSettings = { ...defaultSettings };
+let settingsPath: string;
+
+// Settings management functions
+function loadSettings(): void {
+  try {
+    settingsPath = path.join(app.getPath('userData'), 'settings.json');
+
+    if (fs.existsSync(settingsPath)) {
+      const settingsData = fs.readFileSync(settingsPath, 'utf8');
+      const loadedSettings = JSON.parse(settingsData);
+      userSettings = { ...defaultSettings, ...loadedSettings };
+    } else {
+      saveSettings();
+    }
+  } catch (error) {
+    console.error('Error loading settings:', error);
+    userSettings = { ...defaultSettings };
+  }
+}
+
+function saveSettings(): void {
+  try {
+    const settingsDir = path.dirname(settingsPath);
+    if (!fs.existsSync(settingsDir)) {
+      fs.mkdirSync(settingsDir, { recursive: true });
+    }
+    fs.writeFileSync(settingsPath, JSON.stringify(userSettings, null, 2), 'utf8');
+  } catch (error) {
+    console.error('Error saving settings:', error);
+  }
+}
 
 const isDev = process.env.NODE_ENV === 'development'
 
 // Terminal management
-const terminals = new Map<string, pty.IPty>()
+const terminals = new Map<string, any>()
 let mainWindowRef: BrowserWindow | null = null
 
 function createWindow(): void {
@@ -28,11 +112,13 @@ function createWindow(): void {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
+    mainWindow.loadFile(path.join(__dirname, '../index.html'))
   }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
+    // Setup application menu after window is ready
+    setupApplicationMenu(mainWindow)
   })
 
   // Store reference for terminal communication
@@ -50,80 +136,154 @@ ipcMain.handle('select-directory', async () => {
 
 ipcMain.handle('read-directory', async (_, dirPath: string) => {
   try {
+    // Validate directory path
+    if (!dirPath || typeof dirPath !== 'string') {
+      throw new Error('Invalid directory path provided')
+    }
+
+    // Check if directory exists
+    if (!fs.existsSync(dirPath)) {
+      throw new Error(`Directory does not exist: ${dirPath}`)
+    }
+
+    // Check if path is actually a directory
+    const stats = await fs.promises.stat(dirPath)
+    if (!stats.isDirectory()) {
+      throw new Error(`Path is not a directory: ${dirPath}`)
+    }
+
+    // Check read permissions
+    try {
+      await fs.promises.access(dirPath, fs.constants.R_OK)
+    } catch {
+      throw new Error(`No read permission for directory: ${dirPath}`)
+    }
+
     const items = await fs.promises.readdir(dirPath, { withFileTypes: true })
-    return items.map((item) => ({
-      name: item.name,
-      path: path.join(dirPath, item.name),
-      type: item.isDirectory() ? 'directory' : 'file',
-    }))
-  } catch (error) {
+    return {
+      success: true,
+      items: items.map((item) => ({
+        name: item.name,
+        path: path.join(dirPath, item.name),
+        type: item.isDirectory() ? 'directory' : 'file',
+      }))
+    }
+  } catch (error: any) {
     console.error('Error reading directory:', error)
-    throw error
+    return {
+      success: false,
+      error: error.message || 'Failed to read directory',
+      code: 'DIRECTORY_READ_ERROR'
+    }
   }
 })
 
 // Terminal IPC Handlers
 ipcMain.handle('create-terminal', async (_, cwd?: string) => {
-  const terminalId = `terminal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  try {
+    if (!pty) {
+      return {
+        success: false,
+        error: 'Terminal functionality is not available. node-pty module could not be loaded.',
+        code: 'TERMINAL_NOT_AVAILABLE'
+      }
+    }
 
-  // Determine the best shell and arguments
-  let shell: string
-  let args: string[] = []
+    const terminalId = `terminal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-  if (process.platform === 'win32') {
-    shell = 'powershell.exe'
-    args = ['-NoExit', '-Command', '& {',
-      'Write-Host "Claude Code Terminal Ready!" -ForegroundColor Green;',
-      'Write-Host "Available commands: claude, git, npm, node" -ForegroundColor Yellow;',
-      'if (Get-Command claude -ErrorAction SilentlyContinue) { Write-Host "✓ Claude Code detected" -ForegroundColor Green } else { Write-Host "! Claude Code not found in PATH" -ForegroundColor Red }',
-      '}'
-    ]
-  } else {
-    // macOS/Linux
-    shell = process.env.SHELL || '/bin/bash'
-    if (shell.includes('zsh')) {
-      shell = '/bin/zsh'
+    // Validate and set working directory
+    const workingDir = cwd || process.env.HOME || process.env.USERPROFILE || process.cwd()
+
+    // Check if working directory exists and is accessible
+    if (!fs.existsSync(workingDir)) {
+      throw new Error(`Working directory does not exist: ${workingDir}`)
+    }
+
+    try {
+      const stats = await fs.promises.stat(workingDir)
+      if (!stats.isDirectory()) {
+        throw new Error(`Working directory path is not a directory: ${workingDir}`)
+      }
+    } catch (statError: any) {
+      throw new Error(`Cannot access working directory: ${workingDir} - ${statError.message}`)
+    }
+
+    // Determine the best shell and arguments
+    let shell: string
+    let args: string[] = []
+
+    if (process.platform === 'win32') {
+      shell = 'powershell.exe'
+      args = ['-NoExit', '-Command', '& {',
+        'Write-Host "Claude Code Terminal Ready!" -ForegroundColor Green;',
+        'Write-Host "Available commands: claude, git, npm, node" -ForegroundColor Yellow;',
+        'if (Get-Command claude -ErrorAction SilentlyContinue) { Write-Host "✓ Claude Code detected" -ForegroundColor Green } else { Write-Host "! Claude Code not found in PATH" -ForegroundColor Red }',
+        '}'
+      ]
     } else {
-      shell = '/bin/bash'
+      // macOS/Linux
+      shell = process.env.SHELL || '/bin/bash'
+      if (shell.includes('zsh')) {
+        shell = '/bin/zsh'
+      } else {
+        shell = '/bin/bash'
+      }
+    }
+
+    const terminal = pty.spawn(shell, args, {
+      name: 'xterm-color',
+      cols: 80,
+      rows: 24,
+      cwd: workingDir,
+      env: {
+        ...process.env,
+        TERM: 'xterm-256color',
+        COLORTERM: 'truecolor',
+      },
+    })
+
+    terminal.onData((data: string) => {
+      if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+        mainWindowRef.webContents.send('terminal-data', {
+          terminalId,
+          data,
+        })
+      }
+    })
+
+    terminal.onExit((data: { exitCode: number; signal: number }) => {
+      console.log(`Terminal ${terminalId} exited with code ${data.exitCode}, signal ${data.signal}`)
+      terminals.delete(terminalId)
+      if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+        mainWindowRef.webContents.send('terminal-closed', { terminalId, exitCode: data.exitCode, signal: data.signal })
+      }
+    })
+
+    // Send welcome message for Unix systems
+    if (process.platform !== 'win32') {
+      setTimeout(() => {
+        if (terminals.has(terminalId)) {
+          terminal.write('\r\n\x1b[32mClaude Code Terminal Ready!\x1b[0m\r\n')
+          terminal.write('\x1b[33mAvailable commands: claude, git, npm, node\x1b[0m\r\n')
+          terminal.write('which claude > /dev/null 2>&1 && echo "\\x1b[32m✓ Claude Code detected\\x1b[0m" || echo "\\x1b[31m! Claude Code not found in PATH\\x1b[0m"\r\n')
+        }
+      }, 500)
+    }
+
+    terminals.set(terminalId, terminal)
+    return {
+      success: true,
+      terminalId,
+      workingDirectory: workingDir
+    }
+  } catch (error: any) {
+    console.error('Error creating terminal:', error)
+    return {
+      success: false,
+      error: error.message || 'Failed to create terminal',
+      code: 'TERMINAL_CREATE_ERROR'
     }
   }
-
-  const terminal = pty.spawn(shell, args, {
-    name: 'xterm-color',
-    cols: 80,
-    rows: 24,
-    cwd: cwd || process.env.HOME || process.env.USERPROFILE,
-    env: {
-      ...process.env,
-      TERM: 'xterm-256color',
-      COLORTERM: 'truecolor',
-    },
-  })
-
-  terminal.onData((data) => {
-    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
-      mainWindowRef.webContents.send('terminal-data', {
-        terminalId,
-        data,
-      })
-    }
-  })
-
-  terminal.onExit(() => {
-    terminals.delete(terminalId)
-  })
-
-  // Send welcome message for Unix systems
-  if (process.platform !== 'win32') {
-    setTimeout(() => {
-      terminal.write('\r\n\x1b[32mClaude Code Terminal Ready!\x1b[0m\r\n')
-      terminal.write('\x1b[33mAvailable commands: claude, git, npm, node\x1b[0m\r\n')
-      terminal.write('which claude > /dev/null 2>&1 && echo "\\x1b[32m✓ Claude Code detected\\x1b[0m" || echo "\\x1b[31m! Claude Code not found in PATH\\x1b[0m"\r\n')
-    }, 500)
-  }
-
-  terminals.set(terminalId, terminal)
-  return terminalId
 })
 
 ipcMain.handle('destroy-terminal', async (_, terminalId: string) => {
@@ -141,8 +301,145 @@ ipcMain.handle('write-to-terminal', async (_, terminalId: string, data: string) 
   }
 })
 
+// Settings IPC Handlers
+ipcMain.handle('settings-get', async () => {
+  return userSettings;
+});
+
+ipcMain.handle('settings-update', async (_, updates: Partial<AppSettings>) => {
+  userSettings = { ...userSettings, ...updates };
+  saveSettings();
+  return userSettings;
+});
+
+ipcMain.handle('settings-reset', async () => {
+  userSettings = { ...defaultSettings };
+  saveSettings();
+  return userSettings;
+});
+
+ipcMain.handle('settings-add-recent-file', async (_, filePath: string) => {
+  userSettings.recentFiles = [filePath, ...userSettings.recentFiles.filter(f => f !== filePath)].slice(0, 10);
+  saveSettings();
+  return userSettings;
+});
+
+ipcMain.handle('settings-add-recent-directory', async (_, dirPath: string) => {
+  userSettings.recentDirectories = [dirPath, ...userSettings.recentDirectories.filter(d => d !== dirPath)].slice(0, 10);
+  saveSettings();
+  return userSettings;
+});
+
+// System Integration IPC Handlers
+ipcMain.handle('system-open-file', async (_, filePath: string) => {
+  try {
+    await shell.openPath(filePath);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('system-show-in-folder', async (_, filePath: string) => {
+  try {
+    shell.showItemInFolder(filePath);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('system-open-url', async (_, url: string) => {
+  try {
+    await shell.openExternal(url);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('system-get-info', async () => {
+  return {
+    platform: process.platform,
+    arch: process.arch,
+    version: process.version,
+    isPackaged: app.isPackaged,
+    execPath: process.execPath,
+    appVersion: app.getVersion(),
+    userData: app.getPath('userData'),
+    documents: app.getPath('documents'),
+    downloads: app.getPath('downloads'),
+  };
+});
+
+// Handle file associations and protocol
+const supportedExtensions = ['.pdf', '.docx', '.xlsx', '.pptx', '.html', '.txt', '.md'];
+
+const isSupportedFile = (filePath: string): boolean => {
+  const ext = path.extname(filePath).toLowerCase();
+  return supportedExtensions.includes(ext);
+};
+
+// Handle files opened with the app
+app.on('open-file', (event, filePath) => {
+  event.preventDefault();
+  if (isSupportedFile(filePath) && mainWindowRef && !mainWindowRef.isDestroyed()) {
+    mainWindowRef.webContents.send('file-opened-with-app', { filePath });
+  }
+});
+
+// Handle protocol URLs (analystapp://)
+app.setAsDefaultProtocolClient('analystapp');
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+    mainWindowRef.webContents.send('protocol-url-opened', { url });
+  }
+});
+
+// Handle second instance (Windows/Linux)
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_, commandLine) => {
+    // Someone tried to run a second instance, focus our window instead
+    if (mainWindowRef) {
+      if (mainWindowRef.isMinimized()) mainWindowRef.restore();
+      mainWindowRef.focus();
+
+      // Check for file or protocol in command line
+      const potentialFile = commandLine.find(arg =>
+        isSupportedFile(arg) && fs.existsSync(arg)
+      );
+      const protocolUrl = commandLine.find(arg => arg.startsWith('analystapp://'));
+
+      if (potentialFile) {
+        mainWindowRef.webContents.send('file-opened-with-app', { filePath: potentialFile });
+      } else if (protocolUrl) {
+        mainWindowRef.webContents.send('protocol-url-opened', { url: protocolUrl });
+      }
+    }
+  });
+}
+
 app.whenReady().then(() => {
+  loadSettings();
   createWindow()
+
+  // Check for file in command line arguments
+  if (process.argv.length > 1) {
+    const potentialFile = process.argv[process.argv.length - 1];
+    if (isSupportedFile(potentialFile) && fs.existsSync(potentialFile)) {
+      setTimeout(() => {
+        if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+          mainWindowRef.webContents.send('file-opened-with-app', { filePath: potentialFile });
+        }
+      }, 1000);
+    }
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

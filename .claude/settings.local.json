@@ -23,7 +23,13 @@
       "Bash(where python)",
       "Bash(C:Python313python.exe -c \"import markitdown; print(''MarkItDown successfully imported'')\")",
       "Bash(pip3 install:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(npm run electron:*)",
+      "Bash(npm rebuild:*)",
+      "Bash(npx:*)",
+      "Bash(tsc:*)",
+      "Bash(NODE_ENV=production electron .)",
+      "Bash(NODE_ENV=production npx electron .)"
     ],
     "deny": []
   }
