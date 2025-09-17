@@ -35,14 +35,14 @@ Building a cross-platform productivity app with MarkDown conversion and integrat
 - [x] Test with various file types (PDF, Word, Excel, PowerPoint, etc.)
 
 ## Phase 4: Integrated Terminal Tool (Second Feature)
-- [ ] Create file explorer component for left half of main area
-- [ ] Implement folder tree navigation with file listings
-- [ ] Build integrated terminal component for right half
-- [ ] Set up terminal process spawning in selected directory
-- [ ] Implement "Start Terminal" button with directory context
-- [ ] Add terminal session management (multiple tabs/sessions)
-- [ ] Configure terminal for Claude Code and other CLI tools
-- [ ] Handle terminal input/output and process management
+- [x] Create file explorer component for left half of main area
+- [x] Implement folder tree navigation with file listings
+- [x] Build integrated terminal component for right half
+- [x] Set up terminal process spawning in selected directory
+- [x] Implement "Start Terminal" button with directory context
+- [x] Add terminal session management (multiple tabs/sessions)
+- [x] Configure terminal for Claude Code and other CLI tools
+- [x] Handle terminal input/output and process management
 
 ## Phase 5: Application Polish & Testing
 - [ ] Implement comprehensive error handling across all features

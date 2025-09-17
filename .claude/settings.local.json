@@ -22,7 +22,8 @@
       "Bash(python:*)",
       "Bash(where python)",
       "Bash(C:Python313python.exe -c \"import markitdown; print(''MarkItDown successfully imported'')\")",
-      "Bash(pip3 install:*)"
+      "Bash(pip3 install:*)",
+      "Bash(npm uninstall:*)"
     ],
     "deny": []
   }

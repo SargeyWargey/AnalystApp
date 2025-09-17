@@ -8,6 +8,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // File system operations
   selectFolder: () => ipcRenderer.invoke('select-folder'),
+  selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  readDirectory: (path: string) => ipcRenderer.invoke('read-directory', path),
+
+  // Terminal operations
+  createTerminal: (cwd?: string) => ipcRenderer.invoke('create-terminal', cwd),
+  destroyTerminal: (terminalId: string) => ipcRenderer.invoke('destroy-terminal', terminalId),
+  writeToTerminal: (terminalId: string, data: string) =>
+    ipcRenderer.invoke('write-to-terminal', terminalId, data),
+  onTerminalData: (callback: (data: any) => void) =>
+    ipcRenderer.on('terminal-data', (_, data) => callback(data)),
 
   // Plugin communication
   pluginMessage: (pluginId: string, message: unknown) =>

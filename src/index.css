@@ -1,6 +1,8 @@
-@import 'tailwindcss';
-
 @import '@fontsource-variable/inter';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 body {
   margin: 0;
