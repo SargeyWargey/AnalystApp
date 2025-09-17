@@ -16,7 +16,13 @@
       "Bash(npm run build:*)",
       "Bash(dir:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(where python)",
+      "Bash(C:Python313python.exe -c \"import markitdown; print(''MarkItDown successfully imported'')\")",
+      "Bash(pip3 install:*)"
     ],
     "deny": []
   }

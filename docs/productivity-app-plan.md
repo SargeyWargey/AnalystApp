@@ -23,16 +23,16 @@ Building a cross-platform productivity app with MarkDown conversion and integrat
 - [x] Implement basic theming and styling framework
 
 ## Phase 3: MarkDown Conversion Tool (First Feature)
-- [ ] Integrate MarkItDown Python library via subprocess or API
-- [ ] Create drag-and-drop file import area in main content area
-- [ ] Implement file import dialog as alternative to drag-drop
-- [ ] Build destination folder management on right side
-- [ ] Add/remove destination folder functionality
-- [ ] Implement folder selection validation
-- [ ] Create convert button with proper state management (disabled until destination set)
-- [ ] Build conversion progress indicator and status feedback
-- [ ] Handle conversion errors and user notifications
-- [ ] Test with various file types (PDF, Word, Excel, PowerPoint, etc.)
+- [x] Integrate MarkItDown Python library via subprocess or API
+- [x] Create drag-and-drop file import area in main content area
+- [x] Implement file import dialog as alternative to drag-drop
+- [x] Build destination folder management on right side
+- [x] Add/remove destination folder functionality
+- [x] Implement folder selection validation
+- [x] Create convert button with proper state management (disabled until destination set)
+- [x] Build conversion progress indicator and status feedback
+- [x] Handle conversion errors and user notifications
+- [x] Test with various file types (PDF, Word, Excel, PowerPoint, etc.)
 
 ## Phase 4: Integrated Terminal Tool (Second Feature)
 - [ ] Create file explorer component for left half of main area

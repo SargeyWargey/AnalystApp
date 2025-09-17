@@ -1,5 +1,4 @@
 import React from 'react';
-import { useAppStore } from '../../core/state/store';
 import { useTheme } from '../../core/theme/ThemeProvider';
 import { themeStyles } from '../../core/theme/styles';
 
@@ -61,7 +60,7 @@ const SettingsView: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className={`text-sm ${themeStyles.text.secondary[theme]}`}>Phase 3: MarkDown Tool</span>
-                  <span className="text-gray-500 text-sm">⏳ Pending</span>
+                  <span className="text-green-400 text-sm">✅ Complete</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className={`text-sm ${themeStyles.text.secondary[theme]}`}>Phase 4: Terminal Tool</span>
