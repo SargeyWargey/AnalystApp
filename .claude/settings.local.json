@@ -13,7 +13,10 @@
       "Bash(npm run typecheck:*)",
       "Bash(npm run lint)",
       "Bash(npx tailwindcss:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(dir:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": []
   }

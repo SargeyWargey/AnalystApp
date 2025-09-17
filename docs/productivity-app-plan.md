@@ -16,11 +16,11 @@ Building a cross-platform productivity app with MarkDown conversion and integrat
 - [x] Configure version control and development workflow
 
 ## Phase 2: Core Application Foundation
-- [ ] Create main application window and basic layout
-- [ ] Implement left sidebar with icon navigation system
-- [ ] Set up routing/state management for different tool modes
-- [ ] Create responsive layout that adapts to window resizing
-- [ ] Implement basic theming and styling framework
+- [x] Create main application window and basic layout
+- [x] Implement left sidebar with icon navigation system
+- [x] Set up routing/state management for different tool modes
+- [x] Create responsive layout that adapts to window resizing
+- [x] Implement basic theming and styling framework
 
 ## Phase 3: MarkDown Conversion Tool (First Feature)
 - [ ] Integrate MarkItDown Python library via subprocess or API

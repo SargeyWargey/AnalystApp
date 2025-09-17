@@ -4,6 +4,7 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
@@ -16,6 +17,9 @@ export default {
           900: '#2D1B4E',
           950: '#1A0E2E',
         }
+      },
+      spacing: {
+        '18': '4.5rem', // 72px for sidebar width
       }
     },
   },

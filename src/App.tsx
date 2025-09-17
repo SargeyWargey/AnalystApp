@@ -1,22 +1,31 @@
 
+import Layout from './components/Layout';
+import MarkdownView from './components/views/MarkdownView';
+import TerminalView from './components/views/TerminalView';
+import SettingsView from './components/views/SettingsView';
+import { useAppStore } from './core/state/store';
+
 function App() {
+  const { currentView } = useAppStore();
+
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'markdown':
+        return <MarkdownView />;
+      case 'terminal':
+        return <TerminalView />;
+      case 'settings':
+        return <SettingsView />;
+      default:
+        return <MarkdownView />;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 to-purple-950 text-white">
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-4xl font-bold text-center mb-8">
-          AnalystApp
-        </h1>
-        <div className="text-center">
-          <p className="text-xl mb-4">
-            Cross-Platform Productivity Application
-          </p>
-          <p className="text-gray-300">
-            Phase 1 Setup Complete ✅
-          </p>
-        </div>
-      </div>
-    </div>
-  )
+    <Layout>
+      {renderCurrentView()}
+    </Layout>
+  );
 }
 
-export default App
+export default App;
