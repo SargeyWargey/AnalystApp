@@ -12,11 +12,13 @@ interface FileExplorerItem {
 
 interface FileExplorerProps {
   onDirectorySelect: (path: string) => void;
+  onFileSelect?: (path: string) => void;
   selectedDirectory?: string;
 }
 
 const FileExplorer: React.FC<FileExplorerProps> = ({
   onDirectorySelect,
+  onFileSelect,
   selectedDirectory,
 }) => {
   const { theme } = useTheme();
@@ -118,6 +120,8 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
             if (item.type === 'directory') {
               toggleDirectory(item, index);
               handleDirectoryClick(item.path);
+            } else if (item.type === 'file' && onFileSelect) {
+              onFileSelect(item.path);
             }
           }}
         >

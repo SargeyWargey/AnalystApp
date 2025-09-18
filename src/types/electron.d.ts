@@ -6,6 +6,8 @@ export interface ElectronAPI {
   selectDirectory: () => Promise<{ canceled: boolean; filePaths: string[] }>;
   selectFiles: () => Promise<{ canceled: boolean; filePaths: string[] }>;
   readDirectory: (path: string) => Promise<Array<{ name: string; path: string; type: 'file' | 'directory' }>>;
+  readFile: (path: string) => Promise<string>;
+  getFileStats: (path: string) => Promise<{ size: number; isFile: boolean; isDirectory: boolean; modified: Date; created: Date }>;
 
   // Terminal operations
   createTerminal: (cwd?: string) => Promise<{

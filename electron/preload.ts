@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   selectFiles: () => ipcRenderer.invoke('select-files'),
   readDirectory: (path: string) => ipcRenderer.invoke('read-directory', path),
+  readFile: (path: string) => ipcRenderer.invoke('read-file', path),
+  getFileStats: (path: string) => ipcRenderer.invoke('get-file-stats', path),
 
   // Terminal operations
   createTerminal: (cwd?: string) => ipcRenderer.invoke('create-terminal', cwd),

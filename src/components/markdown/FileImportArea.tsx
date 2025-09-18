@@ -8,12 +8,41 @@ const FileImportArea: React.FC = () => {
   const {
     selectedFiles,
     removeSelectedFile,
-    setShowFileDialog,
+    addSelectedFile,
     supportedExtensions
   } = useMarkdownStore();
 
-  const handleFileSelect = () => {
-    setShowFileDialog(true);
+  const handleFileSelect = async () => {
+    // Use Electron's native file dialog to get full file paths with permissions
+    if (window.electronAPI) {
+      try {
+        const result = await window.electronAPI.selectFiles();
+        if (!result.canceled && result.filePaths) {
+          result.filePaths.forEach((filePath: string) => {
+            addSelectedFile(filePath);
+          });
+        }
+      } catch (error) {
+        console.error('Failed to open file dialog:', error);
+      }
+    } else {
+      // Fallback for browser development
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.accept = supportedExtensions.join(',');
+
+      input.onchange = (e) => {
+        const target = e.target as HTMLInputElement;
+        if (target.files) {
+          Array.from(target.files).forEach(file => {
+            addSelectedFile(file.name); // Browser fallback only has filename
+          });
+        }
+      };
+
+      input.click();
+    }
   };
 
   // Utility function for future use when file sizes are available

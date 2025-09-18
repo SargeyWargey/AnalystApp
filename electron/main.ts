@@ -210,6 +210,68 @@ ipcMain.handle('read-directory', async (_, dirPath: string) => {
   }
 })
 
+// File operations
+ipcMain.handle('read-file', async (_, filePath: string) => {
+  try {
+    // Validate file path
+    if (!filePath || typeof filePath !== 'string') {
+      throw new Error('Invalid file path provided')
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File does not exist: ${filePath}`)
+    }
+
+    // Check if path is actually a file
+    const stats = await fs.promises.stat(filePath)
+    if (!stats.isFile()) {
+      throw new Error(`Path is not a file: ${filePath}`)
+    }
+
+    // Check read permissions
+    try {
+      await fs.promises.access(filePath, fs.constants.R_OK)
+    } catch (accessError) {
+      throw new Error(`No read permission for file: ${filePath}`)
+    }
+
+    // Read file content
+    const content = await fs.promises.readFile(filePath, 'utf8')
+    return content
+  } catch (error: any) {
+    console.error('Error reading file:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('get-file-stats', async (_, filePath: string) => {
+  try {
+    // Validate file path
+    if (!filePath || typeof filePath !== 'string') {
+      throw new Error('Invalid file path provided')
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File does not exist: ${filePath}`)
+    }
+
+    // Get file stats
+    const stats = await fs.promises.stat(filePath)
+    return {
+      size: stats.size,
+      isFile: stats.isFile(),
+      isDirectory: stats.isDirectory(),
+      modified: stats.mtime,
+      created: stats.birthtime,
+    }
+  } catch (error: any) {
+    console.error('Error getting file stats:', error)
+    throw error
+  }
+})
+
 // Terminal IPC Handlers
 ipcMain.handle('create-terminal', async (_, cwd?: string) => {
   try {
