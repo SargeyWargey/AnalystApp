@@ -1,15 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useMarkdownStore } from '../../core/state/markdownStore';
 import { useTheme } from '../../core/theme/ThemeProvider';
 import { themeStyles } from '../../core/theme/styles';
+import { settingsService } from '../../core/settings/settingsService';
 
 const ConversionProgress: React.FC = () => {
   const { theme } = useTheme();
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const {
     conversionJobs,
     removeConversionJob,
     clearCompletedJobs
   } = useMarkdownStore();
+
+  const isDebugMode = settingsService.getSetting('enableDebugMode');
+
+  const toggleLogExpansion = (jobId: string) => {
+    const newExpanded = new Set(expandedLogs);
+    if (newExpanded.has(jobId)) {
+      newExpanded.delete(jobId);
+    } else {
+      newExpanded.add(jobId);
+    }
+    setExpandedLogs(newExpanded);
+  };
 
   const activeJobs = conversionJobs.filter(job => job.status === 'converting');
   const completedJobs = conversionJobs.filter(job => job.status === 'completed');
@@ -106,6 +120,15 @@ const ConversionProgress: React.FC = () => {
                   {job.error && (
                     <p className="text-sm text-red-400 mt-1">{job.error}</p>
                   )}
+                  {/* Debug mode: Show logs toggle */}
+                  {isDebugMode && job.debugLogs && job.debugLogs.length > 0 && (
+                    <button
+                      onClick={() => toggleLogExpansion(job.id)}
+                      className="text-xs text-blue-400 hover:text-blue-300 mt-1 underline"
+                    >
+                      {expandedLogs.has(job.id) ? 'Hide Debug Logs' : 'Show Debug Logs'} ({job.debugLogs.length})
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="flex items-center space-x-3">
@@ -136,6 +159,21 @@ const ConversionProgress: React.FC = () => {
                 </button>
               </div>
             </div>
+            {/* Expanded Debug Logs */}
+            {isDebugMode && job.debugLogs && expandedLogs.has(job.id) && (
+              <div className="mt-3 pt-3 border-t border-gray-600">
+                <h5 className="text-xs font-semibold text-gray-300 mb-2">Debug Logs:</h5>
+                <div className="bg-gray-900 rounded p-3 max-h-40 overflow-y-auto">
+                  <div className="space-y-1">
+                    {job.debugLogs.map((log, index) => (
+                      <div key={index} className="text-xs font-mono text-gray-300">
+                        {log}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

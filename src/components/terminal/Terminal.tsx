@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTheme } from '../../core/theme/ThemeProvider';
 import { themeStyles } from '../../core/theme/styles';
+import Convert from 'ansi-to-html';
 
 interface TerminalSession {
   id: string;
@@ -22,6 +23,15 @@ const Terminal: React.FC<TerminalProps> = ({ workingDirectory, onTerminalReady }
   const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [error, setError] = useState<string>('');
 
+  // ANSI-to-HTML converter
+  const convert = new Convert({
+    fg: '#ffffff',
+    bg: '#000000',
+    newline: false,
+    escapeXML: true,
+    stream: false
+  });
+
   const createNewSession = async () => {
     if (!window.electronAPI) {
       setError('Terminal functionality is only available in the Electron app');
@@ -30,23 +40,37 @@ const Terminal: React.FC<TerminalProps> = ({ workingDirectory, onTerminalReady }
 
     try {
       setError('');
-      const id = await window.electronAPI.createTerminal(workingDirectory || process.cwd());
-      const sessionName = `Terminal ${sessions.length + 1}`;
+      const result = await window.electronAPI.createTerminal(workingDirectory || process.cwd());
 
+      // Handle the result object returned by the main process
+      if (!result.success || !result.terminalId) {
+        setError(result.error || 'Failed to create terminal');
+        return;
+      }
+
+      const sessionName = `Terminal ${sessions.length + 1}`;
       const newSession: TerminalSession = {
-        id,
+        id: result.terminalId,
         name: sessionName,
-        workingDirectory: workingDirectory || process.cwd(),
+        workingDirectory: result.workingDirectory || workingDirectory || process.cwd(),
         isActive: true,
         output: '',
       };
 
       setSessions(prev => [...prev, newSession]);
-      setActiveSessionId(id);
+      setActiveSessionId(result.terminalId);
 
       if (onTerminalReady) {
-        onTerminalReady(id);
+        onTerminalReady(result.terminalId);
       }
+
+      // Focus the input field after creating a new session
+      setTimeout(() => {
+        const input = document.querySelector('#terminal-input') as HTMLInputElement;
+        if (input) {
+          input.focus();
+        }
+      }, 100);
 
     } catch (err) {
       setError(`Failed to start terminal: ${err}`);
@@ -82,10 +106,20 @@ const Terminal: React.FC<TerminalProps> = ({ workingDirectory, onTerminalReady }
 
       if (command.trim()) {
         try {
+          console.log(`Sending command to terminal ${activeSessionId}:`, command);
           await window.electronAPI.writeToTerminal(activeSessionId, command + '\r');
           input.value = '';
         } catch (err) {
+          console.error('Failed to write to terminal:', err);
           setError(`Failed to execute command: ${err}`);
+        }
+      } else {
+        // Send empty command (Enter key)
+        try {
+          await window.electronAPI.writeToTerminal(activeSessionId, '\r');
+          input.value = '';
+        } catch (err) {
+          console.error('Failed to send enter to terminal:', err);
         }
       }
     }
@@ -96,6 +130,7 @@ const Terminal: React.FC<TerminalProps> = ({ workingDirectory, onTerminalReady }
     if (window.electronAPI) {
       // Set up terminal output listener
       window.electronAPI.onTerminalData((data: any) => {
+        console.log('Terminal data received:', data);
         setSessions(prev => prev.map(session => {
           if (session.id === data.terminalId) {
             return {
@@ -168,7 +203,15 @@ const Terminal: React.FC<TerminalProps> = ({ workingDirectory, onTerminalReady }
                   ? 'bg-purple-500/20 text-purple-300'
                   : `${themeStyles.text.secondary[theme]} hover:bg-white/5`
               }`}
-              onClick={() => setActiveSessionId(session.id)}
+              onClick={() => {
+                setActiveSessionId(session.id);
+                setTimeout(() => {
+                  const input = document.querySelector('#terminal-input') as HTMLInputElement;
+                  if (input) {
+                    input.focus();
+                  }
+                }, 50);
+              }}
             >
               <span className="mr-2">⚡</span>
               <span className="truncate max-w-24">{session.name}</span>
@@ -194,7 +237,7 @@ const Terminal: React.FC<TerminalProps> = ({ workingDirectory, onTerminalReady }
               <div
                 className="whitespace-pre-wrap"
                 dangerouslySetInnerHTML={{
-                  __html: activeSession.output.replace(/\n/g, '<br>').replace(/ /g, '&nbsp;')
+                  __html: convert.toHtml(activeSession.output)
                 }}
               />
             </div>
@@ -205,6 +248,7 @@ const Terminal: React.FC<TerminalProps> = ({ workingDirectory, onTerminalReady }
                   $
                 </span>
                 <input
+                  id="terminal-input"
                   type="text"
                   placeholder="Type a command..."
                   onKeyDown={handleKeyDown}

@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import path from 'path';
+import * as path from 'path';
 import { errorHandler, ErrorCode } from '../error/errorHandler';
 import * as fs from 'fs';
 
@@ -43,7 +43,7 @@ export class MarkdownConverterService {
           return;
         }
 
-        const python = spawn('python', [this.pythonScript, 'supported'], {
+        const python = spawn('/opt/homebrew/bin/python3.11', [this.pythonScript, 'supported'], {
           stdio: ['pipe', 'pipe', 'pipe']
         });
 
@@ -56,6 +56,7 @@ export class MarkdownConverterService {
 
         python.stderr.on('data', (data) => {
           stderr += data.toString();
+          console.log('Python stderr:', data.toString());
         });
 
         python.on('close', (code) => {
@@ -107,11 +108,15 @@ export class MarkdownConverterService {
   /**
    * Convert a file to markdown format
    */
-  async convertFile(inputPath: string, outputPath?: string): Promise<ConversionResult> {
+  async convertFile(inputPath: string, outputPath?: string, debugCallback?: (message: string) => void): Promise<ConversionResult> {
     return (await errorHandler.handleAsyncError(
       new Promise((resolve, reject) => {
+        debugCallback?.('Validating input file');
+        debugCallback?.(`Input path: ${inputPath}`);
+
         // Validate input file exists
         if (!fs.existsSync(inputPath)) {
+          debugCallback?.('Input file does not exist');
           const error = errorHandler.createError(
             ErrorCode.FILE_NOT_FOUND,
             'Input file not found',
@@ -122,10 +127,14 @@ export class MarkdownConverterService {
           return;
         }
 
+        debugCallback?.('Input file exists, proceeding with validation');
+
         // Validate output directory exists if outputPath is provided
         if (outputPath) {
+          debugCallback?.(`Validating output directory: ${outputPath}`);
           const outputDir = path.dirname(outputPath);
           if (!fs.existsSync(outputDir)) {
+            debugCallback?.(`Output directory does not exist: ${outputDir}`);
             const error = errorHandler.createError(
               ErrorCode.INVALID_OUTPUT_PATH,
               'Output directory does not exist',
@@ -135,6 +144,7 @@ export class MarkdownConverterService {
             reject(error);
             return;
           }
+          debugCallback?.('Output directory validation passed');
 
           // Check write permissions on output directory
           try {
@@ -168,27 +178,43 @@ export class MarkdownConverterService {
           args.push(outputPath);
         }
 
-        const python = spawn('python', [this.pythonScript, ...args], {
+        debugCallback?.(`Starting Python conversion with args: ${args.join(' ')}`);
+        debugCallback?.(`Using Python: /opt/homebrew/bin/python3.11`);
+        debugCallback?.(`Script: ${this.pythonScript}`);
+
+        console.log('Starting Python conversion with args:', [this.pythonScript, ...args]);
+        const python = spawn('/opt/homebrew/bin/python3.11', [this.pythonScript, ...args], {
           stdio: ['pipe', 'pipe', 'pipe']
         });
+
+        debugCallback?.('Python process spawned, waiting for completion');
 
         let stdout = '';
         let stderr = '';
 
         python.stdout.on('data', (data) => {
           stdout += data.toString();
+          debugCallback?.(`Python stdout: ${data.toString().trim()}`);
         });
 
         python.stderr.on('data', (data) => {
-          stderr += data.toString();
+          const stderrText = data.toString();
+          stderr += stderrText;
+          console.log('Python stderr:', stderrText);
+          debugCallback?.(`Python stderr: ${stderrText.trim()}`);
         });
 
         python.on('close', (code) => {
+          debugCallback?.(`Python process exited with code: ${code}`);
           try {
             if (code === 0) {
+              debugCallback?.('Python conversion successful, parsing result');
               const result = JSON.parse(stdout.trim());
+              debugCallback?.(`Conversion completed: ${result.output_path || 'Unknown output'}`);
               resolve(result);
             } else {
+              debugCallback?.(`Python process failed with exit code ${code}`);
+              debugCallback?.(`stderr: ${stderr}`);
               const error = errorHandler.createError(
                 ErrorCode.CONVERSION_FAILED,
                 'File conversion failed',
@@ -198,6 +224,8 @@ export class MarkdownConverterService {
               reject(error);
             }
           } catch (parseError: any) {
+            debugCallback?.(`Failed to parse Python result: ${parseError.message}`);
+            debugCallback?.(`stdout: ${stdout}`);
             const error = errorHandler.createError(
               ErrorCode.CONVERSION_FAILED,
               'Failed to parse conversion result',
@@ -209,6 +237,7 @@ export class MarkdownConverterService {
         });
 
         python.on('error', (spawnError) => {
+          debugCallback?.(`Failed to spawn Python process: ${spawnError.message}`);
           const error = errorHandler.createError(
             ErrorCode.PYTHON_PROCESS_ERROR,
             'Failed to spawn Python conversion process',

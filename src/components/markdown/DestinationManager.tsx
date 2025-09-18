@@ -30,15 +30,27 @@ const DestinationManager: React.FC = () => {
     }
   };
 
-  const handleBrowseFolder = () => {
-    // This would typically open a folder browser dialog
-    // For now, we'll use a simple prompt (in a real app, use Electron's dialog API)
-    const folderPath = prompt('Enter folder path:');
-    if (folderPath) {
-      setNewFolderPath(folderPath);
-      if (!newFolderName) {
-        const folderName = folderPath.split('/').pop() || folderPath.split('\\').pop() || 'New Folder';
-        setNewFolderName(folderName);
+  const handleBrowseFolder = async () => {
+    try {
+      const result = await (window as any).electronAPI.selectFolder();
+      if (result && !result.canceled && result.filePaths.length > 0) {
+        const folderPath = result.filePaths[0];
+        setNewFolderPath(folderPath);
+        if (!newFolderName) {
+          const folderName = folderPath.split('/').pop() || folderPath.split('\\').pop() || 'New Folder';
+          setNewFolderName(folderName);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to select folder:', error);
+      // Fallback to prompt if Electron API is not available
+      const folderPath = prompt('Enter folder path:');
+      if (folderPath) {
+        setNewFolderPath(folderPath);
+        if (!newFolderName) {
+          const folderName = folderPath.split('/').pop() || folderPath.split('\\').pop() || 'New Folder';
+          setNewFolderName(folderName);
+        }
       }
     }
   };

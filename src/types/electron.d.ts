@@ -4,10 +4,17 @@ export interface ElectronAPI {
   // File system operations
   selectFolder: () => Promise<any>;
   selectDirectory: () => Promise<{ canceled: boolean; filePaths: string[] }>;
+  selectFiles: () => Promise<{ canceled: boolean; filePaths: string[] }>;
   readDirectory: (path: string) => Promise<Array<{ name: string; path: string; type: 'file' | 'directory' }>>;
 
   // Terminal operations
-  createTerminal: (cwd?: string) => Promise<string>;
+  createTerminal: (cwd?: string) => Promise<{
+    success: boolean;
+    terminalId?: string;
+    workingDirectory?: string;
+    error?: string;
+    code?: string;
+  }>;
   destroyTerminal: (terminalId: string) => Promise<void>;
   writeToTerminal: (terminalId: string, data: string) => Promise<void>;
   onTerminalData: (callback: (data: { terminalId: string; data: string }) => void) => void;
@@ -34,6 +41,11 @@ export interface ElectronAPI {
   systemGetInfo: () => Promise<any>;
   onFileOpenedWithApp: (callback: (data: any) => void) => void;
   onProtocolUrlOpened: (callback: (data: any) => void) => void;
+
+  // Markdown conversion operations
+  markdownGetSupportedExtensions: () => Promise<{ success: boolean; extensions?: string[]; error?: string }>;
+  markdownConvertFile: (inputPath: string, outputPath?: string) => Promise<{ success: boolean; input_path?: string; output_path?: string; content_length?: number; error?: string }>;
+  markdownIsFileSupported: (filePath: string) => Promise<boolean>;
 }
 
 declare global {

@@ -9,6 +9,7 @@ export interface ConversionJob {
   error?: string;
   createdAt: Date;
   completedAt?: Date;
+  debugLogs?: string[];
 }
 
 export interface DestinationFolder {
@@ -37,8 +38,9 @@ interface MarkdownState {
   // Conversion jobs
   conversionJobs: ConversionJob[];
   setConversionJobs: (jobs: ConversionJob[]) => void;
-  addConversionJob: (job: Omit<ConversionJob, 'id' | 'createdAt'>) => void;
+  addConversionJob: (job: Omit<ConversionJob, 'id' | 'createdAt'>) => string;
   updateConversionJob: (id: string, updates: Partial<ConversionJob>) => void;
+  addDebugLog: (id: string, message: string) => void;
   removeConversionJob: (id: string) => void;
   clearCompletedJobs: () => void;
 
@@ -116,11 +118,24 @@ export const useMarkdownStore = create<MarkdownState>((set, get) => ({
     };
     const { conversionJobs } = get();
     set({ conversionJobs: [...conversionJobs, newJob] });
+    return id;
   },
   updateConversionJob: (id, updates) => {
     const { conversionJobs } = get();
     const updatedJobs = conversionJobs.map(job =>
       job.id === id ? { ...job, ...updates } : job
+    );
+    set({ conversionJobs: updatedJobs });
+  },
+  addDebugLog: (id, message) => {
+    const { conversionJobs } = get();
+    const timestamp = new Date().toLocaleTimeString();
+    const logMessage = `[${timestamp}] ${message}`;
+    const updatedJobs = conversionJobs.map(job =>
+      job.id === id ? {
+        ...job,
+        debugLogs: [...(job.debugLogs || []), logMessage]
+      } : job
     );
     set({ conversionJobs: updatedJobs });
   },

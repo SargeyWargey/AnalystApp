@@ -4,6 +4,7 @@ import { useMarkdownStore } from '../../core/state/markdownStore';
 import { markdownConverter } from '../../core/services/markdownConverterMock';
 import { useTheme } from '../../core/theme/ThemeProvider';
 import { themeStyles } from '../../core/theme/styles';
+import { settingsService } from '../../core/settings/settingsService';
 
 const ConversionControls: React.FC = () => {
   const { theme } = useTheme();
@@ -15,6 +16,7 @@ const ConversionControls: React.FC = () => {
     setIsConverting,
     addConversionJob,
     updateConversionJob,
+    addDebugLog,
     clearSelectedFiles
   } = useMarkdownStore();
 
@@ -26,46 +28,67 @@ const ConversionControls: React.FC = () => {
 
     setIsConverting(true);
 
+    // Check if debug mode is enabled
+    const isDebugMode = settingsService.getSetting('enableDebugMode');
+
     try {
       // Process each file
       for (const inputPath of selectedFiles) {
         const outputPath = markdownConverter.generateOutputPath(inputPath, selectedDestination.path);
 
-        // Create conversion job with temporary ID for tracking
-        const tempJobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        // Create conversion job and get the actual job ID
         const jobData = {
           inputPath,
           outputPath,
           status: 'converting' as const,
-          progress: 0
+          progress: 0,
+          debugLogs: isDebugMode ? [] : undefined
         };
 
-        addConversionJob(jobData);
+        const jobId = addConversionJob(jobData);
+
+        // Debug logging function
+        const debugLog = (message: string) => {
+          if (isDebugMode) {
+            addDebugLog(jobId, message);
+          }
+        };
+
+        debugLog('Starting conversion process');
+        debugLog(`File: ${inputPath.split('/').pop() || inputPath.split('\\').pop()}`);
+        debugLog(`Destination: ${selectedDestination.path}`);
 
         try {
           // Update progress
-          updateConversionJob(tempJobId, { progress: 25 });
+          updateConversionJob(jobId, { progress: 25 });
+          debugLog('Initializing converter');
 
-          // Perform conversion
-          const result = await markdownConverter.convertFile(inputPath, outputPath);
+          // Perform conversion with debug callback
+          const result = await markdownConverter.convertFile(inputPath, outputPath, debugLog);
+
+          updateConversionJob(jobId, { progress: 90 });
 
           if (result.success) {
-            updateConversionJob(tempJobId, {
+            debugLog('Conversion process completed successfully');
+            updateConversionJob(jobId, {
               status: 'completed',
               progress: 100,
               completedAt: new Date()
             });
           } else {
-            updateConversionJob(tempJobId, {
+            debugLog(`Conversion failed with error: ${result.error}`);
+            updateConversionJob(jobId, {
               status: 'failed',
               error: result.error,
               completedAt: new Date()
             });
           }
         } catch (error) {
-          updateConversionJob(tempJobId, {
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+          debugLog(`Exception during conversion: ${errorMsg}`);
+          updateConversionJob(jobId, {
             status: 'failed',
-            error: error instanceof Error ? error.message : 'Unknown error occurred',
+            error: errorMsg,
             completedAt: new Date()
           });
         }

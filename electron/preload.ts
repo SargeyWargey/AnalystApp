@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // File system operations
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  selectFiles: () => ipcRenderer.invoke('select-files'),
   readDirectory: (path: string) => ipcRenderer.invoke('read-directory', path),
 
   // Terminal operations
@@ -65,4 +66,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('file-opened-with-app', (_, data) => callback(data)),
   onProtocolUrlOpened: (callback: (data: any) => void) =>
     ipcRenderer.on('protocol-url-opened', (_, data) => callback(data)),
+
+  // Markdown conversion operations
+  markdownGetSupportedExtensions: () => ipcRenderer.invoke('markdown-get-supported-extensions'),
+  markdownConvertFile: (inputPath: string, outputPath?: string) =>
+    ipcRenderer.invoke('markdown-convert-file', inputPath, outputPath),
+  markdownIsFileSupported: (filePath: string) =>
+    ipcRenderer.invoke('markdown-is-file-supported', filePath),
 })

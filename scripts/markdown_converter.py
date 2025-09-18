@@ -11,10 +11,10 @@ from pathlib import Path
 
 try:
     from markitdown import MarkItDown
-except ImportError:
+except ImportError as e:
     print(json.dumps({
         "success": False,
-        "error": "MarkItDown library not found. Please install with: pip install markitdown"
+        "error": f"MarkItDown library not found: {str(e)}. Please install with: pip install markitdown"
     }))
     sys.exit(1)
 
@@ -25,7 +25,9 @@ def convert_file(input_path, output_path=None):
         md = MarkItDown()
 
         # Convert the file
+        print(f"DEBUG: Starting conversion of {input_path}", file=sys.stderr, flush=True)
         result = md.convert(input_path)
+        print(f"DEBUG: Conversion completed, got {len(result.text_content) if result.text_content else 0} characters", file=sys.stderr, flush=True)
 
         if not result.text_content:
             return {
@@ -39,8 +41,10 @@ def convert_file(input_path, output_path=None):
             output_path = input_file.parent / f"{input_file.stem}.md"
 
         # Write the markdown content
+        print(f"DEBUG: Writing to {output_path}", file=sys.stderr, flush=True)
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(result.text_content)
+        print(f"DEBUG: File written successfully", file=sys.stderr, flush=True)
 
         return {
             "success": True,

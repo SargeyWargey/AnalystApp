@@ -29,7 +29,17 @@
       "Bash(npx:*)",
       "Bash(tsc:*)",
       "Bash(NODE_ENV=production electron .)",
-      "Bash(NODE_ENV=production npx electron .)"
+      "Bash(NODE_ENV=production npx electron .)",
+      "Bash(npm run rebuild:*)",
+      "Bash(/usr/bin/python3:*)",
+      "WebSearch",
+      "WebFetch(domain:pypi.org)",
+      "Read(//usr/bin/**)",
+      "Read(//usr/local/**)",
+      "Bash(brew install:*)",
+      "Bash(/opt/homebrew/bin/python3.11:*)",
+      "Bash(NODE_ENV=production npm run electron)",
+      "Read(//Users/macmini/Downloads/**)"
     ],
     "deny": []
   }

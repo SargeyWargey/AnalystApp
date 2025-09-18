@@ -2,10 +2,17 @@ import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
 import { setupApplicationMenu } from './menu'
+import { markdownConverter } from '../src/core/services/markdownConverter'
 
-// Temporarily disable node-pty due to C++20 compilation issues
+// Terminal functionality with node-pty
 let pty: any = null;
-console.warn('Terminal functionality is temporarily disabled due to node-pty compilation issues');
+try {
+  pty = require('node-pty');
+  console.log('Terminal functionality enabled with node-pty');
+} catch (error) {
+  console.error('Failed to load node-pty:', error);
+  console.warn('Terminal functionality is disabled due to node-pty loading issues');
+}
 
 // Settings management
 interface AppSettings {
@@ -134,6 +141,31 @@ ipcMain.handle('select-directory', async () => {
   return result
 })
 
+ipcMain.handle('select-folder', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory'],
+    title: 'Select Folder',
+  })
+  return result
+})
+
+ipcMain.handle('select-files', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile', 'multiSelections'],
+    title: 'Select Files to Convert',
+    filters: [
+      { name: 'All Supported Files', extensions: ['pdf', 'docx', 'pptx', 'xlsx', 'doc', 'ppt', 'xls', 'html', 'htm', 'csv', 'json', 'xml', 'txt', 'zip', 'epub', 'jpg', 'jpeg', 'png', 'bmp', 'gif', 'mp3', 'wav', 'm4a', 'flac'] },
+      { name: 'Documents', extensions: ['pdf', 'docx', 'doc', 'txt'] },
+      { name: 'Presentations', extensions: ['pptx', 'ppt'] },
+      { name: 'Spreadsheets', extensions: ['xlsx', 'xls', 'csv'] },
+      { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'bmp', 'gif'] },
+      { name: 'Audio', extensions: ['mp3', 'wav', 'm4a', 'flac'] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  })
+  return result
+})
+
 ipcMain.handle('read-directory', async (_, dirPath: string) => {
   try {
     // Validate directory path
@@ -214,12 +246,7 @@ ipcMain.handle('create-terminal', async (_, cwd?: string) => {
 
     if (process.platform === 'win32') {
       shell = 'powershell.exe'
-      args = ['-NoExit', '-Command', '& {',
-        'Write-Host "Claude Code Terminal Ready!" -ForegroundColor Green;',
-        'Write-Host "Available commands: claude, git, npm, node" -ForegroundColor Yellow;',
-        'if (Get-Command claude -ErrorAction SilentlyContinue) { Write-Host "✓ Claude Code detected" -ForegroundColor Green } else { Write-Host "! Claude Code not found in PATH" -ForegroundColor Red }',
-        '}'
-      ]
+      args = []
     } else {
       // macOS/Linux
       shell = process.env.SHELL || '/bin/bash'
@@ -259,16 +286,7 @@ ipcMain.handle('create-terminal', async (_, cwd?: string) => {
       }
     })
 
-    // Send welcome message for Unix systems
-    if (process.platform !== 'win32') {
-      setTimeout(() => {
-        if (terminals.has(terminalId)) {
-          terminal.write('\r\n\x1b[32mClaude Code Terminal Ready!\x1b[0m\r\n')
-          terminal.write('\x1b[33mAvailable commands: claude, git, npm, node\x1b[0m\r\n')
-          terminal.write('which claude > /dev/null 2>&1 && echo "\\x1b[32m✓ Claude Code detected\\x1b[0m" || echo "\\x1b[31m! Claude Code not found in PATH\\x1b[0m"\r\n')
-        }
-      }, 500)
-    }
+    // Let the terminal start clean without welcome messages
 
     terminals.set(terminalId, terminal)
     return {
@@ -370,6 +388,35 @@ ipcMain.handle('system-get-info', async () => {
     documents: app.getPath('documents'),
     downloads: app.getPath('downloads'),
   };
+});
+
+// Markdown Conversion IPC Handlers
+ipcMain.handle('markdown-get-supported-extensions', async () => {
+  try {
+    return await markdownConverter.getSupportedExtensions();
+  } catch (error: any) {
+    console.error('Error getting supported extensions:', error);
+    return { success: false, error: error.message || 'Failed to get supported extensions' };
+  }
+});
+
+ipcMain.handle('markdown-convert-file', async (_, inputPath: string, outputPath?: string) => {
+  try {
+    console.log('IPC: Converting file:', inputPath, 'to:', outputPath);
+    return await markdownConverter.convertFile(inputPath, outputPath);
+  } catch (error: any) {
+    console.error('Error converting file:', error);
+    return { success: false, error: error.message || 'File conversion failed' };
+  }
+});
+
+ipcMain.handle('markdown-is-file-supported', async (_, filePath: string) => {
+  try {
+    return await markdownConverter.isFileSupported(filePath);
+  } catch (error: any) {
+    console.error('Error checking file support:', error);
+    return false;
+  }
 });
 
 // Handle file associations and protocol
